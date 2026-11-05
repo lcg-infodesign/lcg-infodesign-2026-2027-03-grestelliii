@@ -1,9 +1,11 @@
 let myTable;
 let anni = [2005, 2006, 2007, 2008, 2009, 2010];
+let hover = null; // se il mouse non è su nessun pallino non legge nessun nome
 
 async function setup() {
   createCanvas(windowWidth, windowHeight);
   // carico il dataset
+  textFont("Helvetica");
   myTable = await loadTable("assets/data.csv", ",", "header");
 
   // varie prove per capire se il datsset è stato caricato correttamente
@@ -20,6 +22,7 @@ async function setup() {
 
 function draw() {
   background(44, 44, 44);
+  hover = null;
 
   // asse del tempo
   stroke(255, 255, 255);
@@ -34,12 +37,12 @@ function draw() {
 
     let yCentro = height * 0.75; // di base il glifo sta sotto l'asse
     if (i % 2 === 1) {
-      yCentro = height * 0.25;   // MA gli anni dispari della lista stanno sopra
+      yCentro = height * 0.25; // MA gli anni dispari della lista stanno sopra
     }
 
     // stelo
     stroke(255, 255, 255);
-    strokeWeight(1); // NUOVO: riporta il tratto normale dopo i cerchi sottili
+    strokeWeight(1);
     line(x, height / 2, x, yCentro);
 
     // centro del glifo
@@ -67,24 +70,45 @@ function draw() {
     for (let r = 0; r < myTable.getRowCount(); r++) {
       if (myTable.getNum(r, 0) === anni[i]) {
         let tipo = myTable.getString(r, 1);
-        let testo = myTable.getString(r, 3); // NUOVO: leggo la cella come testo
-        let visitatori = Number(testo);      // NUOVO: la trasformo in numero
+        let testo = myTable.getString(r, 3); // leggo la cella come testo
+        let visitatori = Number(testo); // la trasformo in numero
 
         let angolo = map(n, 0, totale, 0, TWO_PI);
         let d = distanza(visitatori) * raggioMax;
 
         if (tipo === "Museo") {
-          fill(80, 170, 255);
+          fill(80, 170, 255); 
         } else if (tipo === "Istituto Culturale") {
           fill(230, 110, 180);
         } else {
           fill(120, 210, 110);
         }
 
+        // salvo la posizione del pallino
+        let px = x + cos(angolo) * d;
+        let py = yCentro + sin(angolo) * d;
+
+        // la dimensione del pallino non è fissa, ma dipende dal numero di visitatori annuali
+        let dimBase = map(sqrt(visitatori), 0, sqrt(822174), 4, 20);
+        let dimensione = dimBase;
+
+        // se il mouse è vicino al pallino, lo ingrandisco e ricordo i suoi dati
+        if (dist(mouseX, mouseY, px, py) < max(dimBase / 2, 6)) {
+          dimensione = dimBase + 6;
+          hover = {
+            nome: myTable.getString(r, 2),
+            visitatori: visitatori,
+            x: px,
+            y: py,
+          };
+        }
+
         noStroke();
-        ellipse(x + cos(angolo) * d, yCentro + sin(angolo) * d, 8, 8);
+        ellipse(px, py, dimensione, dimensione); // usa px, py e dimensione
         n++;
+
       }
+
     }
 
     // anno
@@ -95,6 +119,10 @@ function draw() {
   }
 
   drawLegenda();
+
+  if (hover !== null) {
+  drawTooltip();
+  }
 
 }
 
@@ -115,6 +143,7 @@ function distanza(i) {
     }
 }
 
+// legenda e titolo
 function drawLegenda() {
   noStroke();
   fill(255);
@@ -122,7 +151,6 @@ function drawLegenda() {
   // titolo
   textSize(22);
   text("Visitatori dei musei milanesi tra il 2005 e il 2010", 40, 40, 170); // 170 indica la larghezza, così va a capo da solo
-  textFont("Helvetica");
 
   // legenda in basso a destra
   let legx = windowWidth - 190;
@@ -147,9 +175,43 @@ function drawLegenda() {
   fill(255);
   text("Istituto Culturale", legx + 20, legy + 98);
 
-  text("Distanza dal centro = n. visitatori", legx, legy + 126);
-  text("1° cerchio: 500", legx, legy + 148);
-  text("2° cerchio: 100.000", legx, legy + 166);
-  text("3° cerchio: 500.000", legx, legy + 184);
-  text("La posizione attorno al centro non ha significato.", legx, legy + 206, 180);
+  text("Distanza dal centro e dimensione = n. visitatori", legx, legy + 126, 170);
+  text("1° cerchio: 500", legx, legy + 168);
+  text("2° cerchio: 100.000", legx, legy + 186);
+  text("3° cerchio: 500.000", legx, legy + 204);
+  text("La posizione attorno al centro non ha significato.", legx, legy + 226, 170);
+}
+
+function drawTooltip() {
+  let riga1 = hover.nome;
+  let riga2 = hover.visitatori.toLocaleString("it-IT") + " visitatori";
+
+  textSize(13);
+  let w = max(textWidth(riga1), textWidth(riga2)) + 20;
+  let h = 50;
+
+  // di base il riquadro sta a destra e sotto il pallino
+  let bx = hover.x + 14;
+  let by = hover.y + 14;
+  // ma se esce dallo schermo si sposta a sinistra o sopra
+  if (bx + w > width) {
+    bx = hover.x - w - 14;
+  }
+  if (by + h > height) {
+    by = hover.y - h - 14;
+  }
+
+  fill(20);
+  stroke(255);
+  strokeWeight(0.5);
+  rect(bx, by, w, h, 4);
+
+  noStroke();
+  fill(255);
+  text(riga1, bx + 10, by + 20);
+  text(riga2, bx + 10, by + 38);
+}
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
 }
